@@ -139,7 +139,7 @@ us==1.0.0
 virtualenv==16.3.0
 wcwidth==0.1.7
 webencodings==0.5.1
-Werkzeug==0.14.1
+Werkzeug==0.15.3
 widgetsnbextension==3.4.1
 workalendar==4.2.0
 wrapt==1.11.2

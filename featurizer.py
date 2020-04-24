@@ -26,23 +26,17 @@ class Featurizer():
                 print("Illegal value found for config in accelerometer section: 'mode'")
                 raise Exception()
             accelerometer_config_dict.update({"window_size_in_minutes":window_size_in_minutes, "mode":mode})
-
         except:
             print("Error reading config file.TIP:")
             exit(1)
-
         config_dict.update({'accelerometer':accelerometer_config_dict})
         print(config_dict)
-
 
     def set_out_dir(self, out_dir):
         self.out_dir = out_dir
 
     def set_in_path(self, in_path):
         self.in_path = in_path
-
-
-
 
     def featurize(self, file):
         print("Extracting features from", file)
@@ -76,7 +70,6 @@ class Featurizer():
                 "out of", len(found_file_list), "files")
                 print("Continuing feature extraction with the remaining", len(self.file_list), "files.",
                 "TIP: run with restart option to rewrite")
-
 
     def run(self):
         print("Starting feature extraction process...")

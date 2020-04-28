@@ -15,8 +15,8 @@ import pywt
 
 class Accelerometer:
 
-    acc_features = ['int_desc', 'int_rms', 'mag_desc', 'pear_coef', 'sma', 'svm', 'ecdf_5', 'fft', 'psd', 'lmbs']
-    # acc_features = ['int_desc', 'int_rms', 'mag_desc', 'pear_coef', 'sma', 'svm', 'ecdf_5', 'fft', 'psd']
+    # acc_features = ['int_desc', 'int_rms', 'mag_desc', 'pear_coef', 'sma', 'svm', 'ecdf_5', 'fft', 'psd', 'lmbs']
+    acc_features = ['int_desc', 'int_rms', 'mag_desc', 'pear_coef', 'sma', 'svm', 'ecdf_5', 'fft', 'psd']
     # acc_features = ['int_desc', 'int_rms', 'mag_desc', 'pear_coef']
 
     def __init__(self, in_file_path, config):
@@ -26,6 +26,8 @@ class Accelerometer:
         self.df_acc = self.df_acc.sort_values(by=['timestamp']).reset_index(drop=True)
         self.window_size_in_minutes = config['window_size_in_minutes']
         self.mode = config['mode']
+        self.index = config['index']
+        self.max = config['max']
 
     def ecdfRep(data, components):
     #
@@ -250,7 +252,9 @@ class Accelerometer:
     def run_feature_extraction(self):
         self.df_acc['time'] = pd.to_datetime(self.df_acc.timestamp, unit='ms')
         self.df_acc['window'] = ((self.df_acc.time - self.df_acc.time[0]).dt.total_seconds()/ (self.window_size_in_minutes * 60)).sort_values().round(0).astype(int)
-        bar = Bar('Processing', max=self.df_acc['window'].unique().size, suffix='%(percent)d%% (%(index)d / %(max)d) [%(eta_td)s]')
+        A = 'as'
+        bar = Bar('Processing file ' + str(self.index) + ' of ' + str(self.max),
+        max=self.df_acc['window'].unique().size, suffix='%(percent)d%% (%(index)d / %(max)d) [%(eta_td)s]')
         df_feature_windows = self.df_acc.groupby(['window'])[['double_x', 'double_y', 'double_z', 'timestamp']].apply(self.featurize_window, bar)
         bar.finish()
         # window = 0

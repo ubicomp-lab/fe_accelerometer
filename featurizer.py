@@ -1,4 +1,3 @@
-from progress.bar import Bar
 from accelerometer import Accelerometer
 import time
 import os
@@ -87,12 +86,13 @@ class Featurizer():
         self.file_list = self.in_path +  pd.Series(self.file_list)
 
     def run(self):
-        # bar = Bar('Total Progress', max=len(self.file_list), suffix='%(percent)d%% (%(index)d / %(max)d) [%(eta_td)s]')
-        # print("Starting feature extraction process...")
+        index = 0
+        max = len(self.file_list)
         for file in self.file_list:
+            index = index + 1
+            self.config_dict['accelerometer'].update({'index':index, 'max':max})
             accelerometer_featurizer = Accelerometer(file, self.config_dict['accelerometer'])
             df_feature_windows, df_acc = accelerometer_featurizer.run_feature_extraction()
             df_feature_windows.to_csv(os.path.join(self.out_dir, 'acc_' + os.path.basename(file)))
-            # bar.next()
-            time.sleep(2)
+
         return 1

@@ -1,8 +1,7 @@
 
 from optparse import OptionParser
-import os
-
 from featurizer import Featurizer
+import os
 
 parser = OptionParser()
 parser.add_option("-f", "--file", dest="filename",
@@ -14,7 +13,7 @@ parser.add_option("-o", "--out", dest="out",
 parser.add_option("-v", "--verbose",
                   action="store_false", dest="verbose", default=True,
                   help="don't print verbose messages to stdout")
-parser.add_option("-r", "--restart",
+parser.add_option("-r", "--restart", dest='should_restart',
                     action="store_true" , default=False,
                   help="restart by rewriting output files present in OUTDIR")
 def main():
@@ -39,6 +38,7 @@ def main():
             parser.error("" + options.dir +" is not a directory")
         else:
             fearturizer.set_in_path(options.dir)
+    fearturizer.set_restart(options.should_restart)
     fearturizer.prepare()
     fearturizer.run()
 

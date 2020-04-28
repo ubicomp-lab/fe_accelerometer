@@ -3,3 +3,6 @@ loader.py
 plot_spectrogram.ipynb
 out/
 __pycache__/
+.DS_Store
+*.pyz
+featurizer.pyc

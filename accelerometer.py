@@ -15,58 +15,17 @@ import pywt
 
 class Accelerometer:
 
-        # acc_features = ['int_desc', 'int_rms', 'mag_desc', 'pear_coef', 'sma', 'svm', 'ecdf_5', 'fft', 'psd', 'lmbs']
-    acc_features = ['int_desc', 'int_rms', 'mag_desc', 'pear_coef', 'sma', 'svm', 'ecdf_5', 'fft', 'psd']
+    acc_features = ['int_desc', 'int_rms', 'mag_desc', 'pear_coef', 'sma', 'svm', 'ecdf_5', 'fft', 'psd', 'lmbs']
+    # acc_features = ['int_desc', 'int_rms', 'mag_desc', 'pear_coef', 'sma', 'svm', 'ecdf_5', 'fft', 'psd']
     # acc_features = ['int_desc', 'int_rms', 'mag_desc', 'pear_coef']
 
-    def __init__(self, config):
-        self.df_acc = pd.read_csv(config['path'], header=None)
+    def __init__(self, in_file_path, config):
+        self.df_acc = pd.read_csv(in_file_path, header=None, nrows=100000)
         self.df_acc.columns = ['_id1', '_id2', 'timestamp', 'device_id', 'double_x', 'double_y', 'double_z',
         'accuracy', 'label']
-        self.df_acc.device_id='John Doe'
-        self.df_acc = self.df_acc.sort_values(by=['timestamp']).reset_index(drop=True)[['timestamp', 'device_id', 'double_x',
-         'double_y', 'double_z', 'accuracy', 'label']]
+        self.df_acc = self.df_acc.sort_values(by=['timestamp']).reset_index(drop=True)
         self.window_size_in_minutes = config['window_size_in_minutes']
         self.mode = config['mode']
-        self.out = config['output_path']
-
-    def run_feature_extraction(self):
-        window = 0
-        window_start_time = self.df_acc.timestamp.iloc[0]
-        window_end_time = self.df_acc.timestamp.iloc[-1]
-        window_next_time = window_start_time + (datetime.timedelta(minutes=self.window_size_in_minutes).seconds * 10**3)
-        window_id = 0
-        window_start_index = 0
-        self.df_acc['window_id'] = -1
-        df_feature_windows = pd.DataFrame(columns= ['_window_id', 'start_time', 'end_time'])
-        estimated_windows = (self.df_acc.timestamp.iloc[-1] - self.df_acc.timestamp.iloc[0]) / (self.window_size_in_minutes * 60000)
-        bar = Bar('Extracting features', max=estimated_windows, suffix='%(percent)d%%, - processed windows: %(index)d / %(max)d - [%(eta)s]')
-        while window_next_time < window_end_time:
-            bar.next()
-            window += 1
-            window_indices = self.df_acc.iloc[window_start_index:].timestamp < window_next_time
-            self.df_acc.window_id.iloc[window_start_index:][window_indices] = window_id
-            feature_dict = self.featurize_window(self.df_acc.iloc[window_start_index:][window_indices], self.acc_features, self.mode, self.window_size_in_minutes)
-            feature_dict.update({'_window_id': window_id, 'start_time': window_start_time, 'end_time': window_next_time - 1, 'sample_count':window_indices[window_indices].index.size})
-            df_feature_windows = df_feature_windows.append(feature_dict, ignore_index=True)
-            window_start_time = window_next_time
-            window_next_time = window_next_time + (datetime.timedelta(minutes=self.window_size_in_minutes).seconds * 10**3)
-            window_id = window_id + 1
-            window_start_index = window_indices[~window_indices].index[0]
-
-        window_indices = self.df_acc.iloc[window_start_index:].timestamp < window_next_time
-        feature_dict = self.featurize_window(self.df_acc.iloc[window_start_index:], self.acc_features, self.mode, self.window_size_in_minutes)
-        self.df_acc.window_id.iloc[window_start_index:][window_indices] = window_id
-        feature_dict.update({'_window_id': window_id, 'start_time': window_start_time, 'end_time': window_next_time, 'sample_count':window_indices[window_indices].index.size})
-        df_feature_windows = df_feature_windows.append(feature_dict, ignore_index=True)
-        df_feature_windows.start_time = df_feature_windows.start_time.astype(np.int64)
-        df_feature_windows.end_time = df_feature_windows.end_time.astype(np.int64)
-        df_feature_windows.sample_count = df_feature_windows.sample_count.astype(np.int64)
-        df_feature_windows._window_id = df_feature_windows._window_id.astype(np.int64)
-        bar.finish()
-        return df_feature_windows, self.df_acc
-
-
 
     def ecdfRep(data, components):
     #
@@ -99,12 +58,10 @@ class Accelerometer:
     2 - time + frequency + stats
     3 - statistical methods only
     """
-    def featurize_window(self, df_fw, feature_list, mode, window_size_in_minutes):
+    def featurize_window(self, df_fw, bar):
         local_dict = OrderedDict()
-
-
-        if mode > 0 and mode < 3:
-            if df_fw.index.size >= (30*window_size_in_minutes):
+        if self.mode > 0 and self.mode < 3:
+            if df_fw.index.size >= (30*self.window_size_in_minutes):
                 df_fw.double_x = df_fw.double_x.replace({0:1e-08})
                 df_fw.double_y = df_fw.double_y.replace({0:1e-08})
                 df_fw.double_z = df_fw.double_z.replace({0:1e-08})
@@ -117,7 +74,8 @@ class Accelerometer:
                 step = (df_fw.timestamp.iloc[-1] - df_fw.timestamp.iloc[0]) /df_fw.index.size
                 for ti in range(df_fw.timestamp.iloc[0], df_fw.timestamp.iloc[-1], int(step)):
                     xnew.append(ti)
-                f_fs = window_size_in_minutes * 60 / df_fw.index.size
+
+                f_fs = self.window_size_in_minutes * 60 / df_fw.index.size
                 L = 512 # change it to 512
                 local_dict.update({'skip_fft':False, 'fx': f_x(xnew), 'fy': f_y(xnew), 'fz': f_z(xnew), 'fr': f_r(xnew), 'fs': f_fs, 'L': L})
             else:
@@ -126,23 +84,21 @@ class Accelerometer:
                 local_dict['skip_td'] = True
             else:
                 local_dict['skip_td'] = False
-
-        if mode == 0:
+        if self.mode == 0:
             local_dict['skip_fft'] = True
             if df_fw.index.size == 0:
                 local_dict['skip_td'] = True
             else:
                 local_dict['skip_td'] = False
-        if mode == 3:
+        if self.mode == 3:
             local_dict['skip_fft'] = True
             local_dict['skip_td'] = True
-
-
-        feat_dict = OrderedDict()
-
-
-
-        for feature in feature_list:
+        feat_dict = {}
+        #window information:
+        feat_dict.update({'start_timestamp':df_fw.timestamp[0]})
+        feat_dict.update({'end_timestamp':df_fw.timestamp[0] + 6*10**3})
+        feat_dict.update({'sample_count':df_fw.index.size})
+        for feature in self.acc_features:
             if feature == 'int_desc':
                 if not local_dict['skip_td']:
                     int_desc = np.sqrt((df_fw.double_x ** 2).describe() + (df_fw.double_y **2).describe() + (df_fw.double_z ** 2).describe())
@@ -269,9 +225,13 @@ class Accelerometer:
                                       'psd_max_y': np.nan,
                                       'psd_max_z': np.nan,
                                       'psd_max_r': np.nan})
+                    feat_dict.update({'psd_max_x_05_3': np.nan,
+                      'psd_max_y_05_3': np.nan,
+                      'psd_max_z_05_3': np.nan,
+                      'psd_max_r_05_3': np.nan})
             elif feature == 'lmbs':
                 if not local_dict['skip_td']:
-                    lmb_f_05_3 = np.linspace(0.5, 3, 10000)
+                    lmb_f_05_3 = np.linspace(0.5, 3, 100)
                     lmb_psd_x = signal.lombscargle(df_fw.timestamp, df_fw.double_x, lmb_f_05_3, normalize=False)
                     lmb_psd_y = signal.lombscargle(df_fw.timestamp, df_fw.double_y, lmb_f_05_3, normalize=False)
                     lmb_psd_z = signal.lombscargle(df_fw.timestamp, df_fw.double_z, lmb_f_05_3, normalize=False)
@@ -284,14 +244,54 @@ class Accelerometer:
                       'lmb_psd_max_y_05_3': np.nan,
                       'lmb_psd_max_z_05_3': np.nan})
 
+        bar.next()
+        return pd.Series(feat_dict)
 
-        return feat_dict
+    def run_feature_extraction(self):
+        self.df_acc['time'] = pd.to_datetime(self.df_acc.timestamp, unit='ms')
+        self.df_acc['window'] = ((self.df_acc.time - self.df_acc.time[0]).dt.total_seconds()/ (self.window_size_in_minutes * 60)).sort_values().round(0).astype(int)
+        bar = Bar('Processing', max=self.df_acc['window'].unique().size, suffix='%(percent)d%% (%(index)d / %(max)d) [%(eta_td)s]')
+        df_feature_windows = self.df_acc.groupby(['window'])[['double_x', 'double_y', 'double_z', 'timestamp']].apply(self.featurize_window, bar)
+        bar.finish()
+        # window = 0
+        # window_start_time = self.df_acc.timestamp.iloc[0]
+        # window_end_time = self.df_acc.timestamp.iloc[-1]
+        # window_next_time = window_start_time + (datetime.timedelta(minutes=self.window_size_in_minutes).seconds * 10**3)
+        # window_id = 0
+        # window_start_index = 0
+        # self.df_acc['window_id'] = -1
+        # df_feature_windows = pd.DataFrame(columns= ['_window_id', 'start_time', 'end_time'])
+        # estimated_windows = (self.df_acc.timestamp.iloc[-1] - self.df_acc.timestamp.iloc[0]) / (self.window_size_in_minutes * 60000)
+        # bar = Bar('Extracting features', max=estimated_windows, suffix='%(percent)d%%, - processed windows: %(index)d / %(max)d - [%(eta)s]')
+        # while window_next_time < window_end_time:
+        #     bar.next()
+        #     window += 1
+        #     window_indices = self.df_acc.iloc[window_start_index:].timestamp < window_next_time
+        #     self.df_acc.window_id.iloc[window_start_index:][window_indices] = window_id
+        #     feature_dict = self.featurize_window(self.df_acc.iloc[window_start_index:][window_indices], self.acc_features, self.mode, self.window_size_in_minutes)
+        #     feature_dict.update({'_window_id': window_id, 'start_time': window_start_time, 'end_time': window_next_time - 1, 'sample_count':window_indices[window_indices].index.size})
+        #     df_feature_windows = df_feature_windows.append(feature_dict, ignore_index=True)
+        #     window_start_time = window_next_time
+        #     window_next_time = window_next_time + (datetime.timedelta(minutes=self.window_size_in_minutes).seconds * 10**3)
+        #     window_id = window_id + 1
+        #     window_start_index = window_indices[~window_indices].index[0]
+        #
+        # window_indices = self.df_acc.iloc[window_start_index:].timestamp < window_next_time
+        # feature_dict = self.featurize_window(self.df_acc.iloc[window_start_index:], self.acc_features, self.mode, self.window_size_in_minutes)
+        # self.df_acc.window_id.iloc[window_start_index:][window_indices] = window_id
+        # feature_dict.update({'_window_id': window_id, 'start_time': window_start_time, 'end_time': window_next_time, 'sample_count':window_indices[window_indices].index.size})
+        # df_feature_windows = df_feature_windows.append(feature_dict, ignore_index=True)
+        # df_feature_windows.start_time = df_feature_windows.start_time.astype(np.int64)
+        # df_feature_windows.end_time = df_feature_windows.end_time.astype(np.int64)
+        # df_feature_windows.sample_count = df_feature_windows.sample_count.astype(np.int64)
+        # df_feature_windows._window_id = df_feature_windows._window_id.astype(np.int64)
+        # bar.finish()
+        return df_feature_windows, self.df_acc
 
 def main():
-    sample_config = {'window_size_in_minutes':1, 'path': "../../../data/accelerometer/835b51bd-ee31-49e8-a653-cb75a7e4c98e.csv",
-    'output_path': "../../../data/accelerometer/out/",
-    'mode':1}
-    accelerometer = Accelerometer(sample_config)
+    sample_config = {'window_size_in_minutes':1, 'mode':1}
+    in_path = "../../../data/accelerometer/835b51bd-ee31-49e8-a653-cb75a7e4c98e.csv"
+    accelerometer = Accelerometer(in_path, sample_config)
     accelerometer.run_feature_extraction()
 if __name__ == '__main__':
     main()
